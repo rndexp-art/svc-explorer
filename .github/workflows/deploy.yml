@@ -1,0 +1,19 @@
+name: deploy
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+jobs:
+  notify-gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch gateway redeploy
+        env:
+          GH_TOKEN: ${{ secrets.GATEWAY_DISPATCH_PAT }}
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/rndexp-art/rndexpart/dispatches \
+            -d '{"event_type":"service-updated","client_payload":{"service":"explorer","ref":"${{ github.sha }}"}}'

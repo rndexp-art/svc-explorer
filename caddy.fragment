@@ -1,0 +1,15 @@
+# Caddy snippet for the explorer service.
+# Production hostname `explorer.rndexp.art` — `rndexp render --env local`
+# rewrites it to `explorer.rndexp.localhost`.
+#
+# Every path on this site is gated behind a valid `rndexp_auth` cookie via the
+# `rndexp_auth_forward` snippet defined in services/auth/caddy.fragment. The
+# snippet 302s unauthenticated requests to the auth login page, sets a target
+# cookie so the user lands back here after login, and on success injects the
+# X-Auth-* headers our auth dependency reads.
+
+explorer.rndexp.art {
+	encode zstd gzip
+	import rndexp_auth_forward
+	reverse_proxy explorer:8005
+}

@@ -1,0 +1,32 @@
+# Explorer service compose fragment. Included by the gateway's
+# docker-compose.generated.yml when `explorer` is enabled in config/services.yml.
+#
+# Caddy reverse-proxies to `explorer:8005` over the project's default docker
+# network — no public port bindings here.
+#
+# Reads the same NEO4J_USER / NEO4J_PASSWORD the neo4j service uses, and
+# connects over the docker network at bolt://neo4j:7687.
+
+services:
+  explorer:
+    build:
+      # Compose `include:` resolves relative paths in this fragment from the
+      # fragment's own directory — so the build context is this directory.
+      context: .
+      dockerfile: Dockerfile
+    image: rndexpart/explorer:local
+    restart: unless-stopped
+    expose:
+      - "8005"
+    environment:
+      EXPLORER_NEO4J_URI: ${EXPLORER_NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      EXPLORER_MAX_DEPTH: ${EXPLORER_MAX_DEPTH:-3}
+      EXPLORER_MAX_NODES: ${EXPLORER_MAX_NODES:-256}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8005/healthz', timeout=2).status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
