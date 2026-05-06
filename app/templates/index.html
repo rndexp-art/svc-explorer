@@ -4,475 +4,73 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>explorer · rndexp.art</title>
-  <style>
-    :root { color-scheme: dark; }
-    html, body { margin: 0; padding: 0; background: #05060a; color: #e6f1ff; height: 100%; overflow: hidden;
-      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
-    #scene { position: fixed; inset: 0; touch-action: none; cursor: grab; }
-    #scene:active { cursor: grabbing; }
-    #topbar {
-      position: fixed; top: 0; left: 0; right: 0; padding: 10px 14px;
-      display: flex; justify-content: space-between; align-items: center; gap: 12px;
-      background: linear-gradient(to bottom, rgba(5,6,10,.85), rgba(5,6,10,0));
-      pointer-events: none; z-index: 5;
+  <link rel="stylesheet" href="/static/css/explorer.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.160.0",
+        "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+      }
     }
-    #topbar > * { pointer-events: auto; }
-    #topbar .title { font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 12px; color: #9fbfff; }
-    #topbar .meta { font-size: 11px; color: #6b7e9f; }
-    #topbar form.signout { display: inline; }
-    #topbar button {
-      font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 6px;
-      border: 1px solid rgba(159,191,255,.25); background: rgba(159,191,255,.05); color: inherit;
-      cursor: pointer;
-    }
-    #topbar button:hover { background: rgba(159,191,255,.12); }
-
-    #status {
-      position: fixed; bottom: 12px; left: 12px; font-size: 11px; color: #6b7e9f;
-      padding: 4px 10px; border-radius: 6px; background: rgba(5,6,10,.6);
-      backdrop-filter: blur(4px); pointer-events: none; z-index: 5;
-    }
-    #status.error { color: #ff8aa3; }
-    #status.success { color: #8affb3; }
-
-    /* HUD — small holographic panel that snaps over the targeted node. */
-    #hud {
-      position: fixed; left: 0; top: 0; min-width: 180px; max-width: 280px;
-      transform: translate(-50%, calc(-100% - 18px));
-      padding: 10px 12px;
-      border: 1px solid rgba(120,200,255,.45);
-      background: linear-gradient(135deg, rgba(20,30,55,.78), rgba(10,18,35,.88));
-      backdrop-filter: blur(6px) saturate(140%);
-      box-shadow: 0 0 24px rgba(80,160,255,.18), inset 0 0 12px rgba(120,200,255,.08);
-      border-radius: 6px;
-      pointer-events: none;
-      opacity: 0; transition: opacity .14s ease-out, transform .14s ease-out;
-      z-index: 4;
-      color: #d6e8ff;
-    }
-    #hud.visible { opacity: 1; }
-    #hud .label {
-      font-weight: 600; font-size: 12px; letter-spacing: .04em;
-      text-transform: uppercase; color: #9fdcff;
-      margin: 0 0 4px;
-    }
-    #hud .labels { font-size: 10px; color: #7faec9; margin: 0 0 6px; }
-    #hud .summary {
-      font-size: 12px; line-height: 1.45; color: #d6e8ff;
-      max-height: 6.4em; overflow: hidden;
-    }
-    #hud::after {
-      content: ""; position: absolute; left: 50%; bottom: -7px;
-      width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg);
-      background: linear-gradient(135deg, rgba(20,30,55,.78), rgba(10,18,35,.88));
-      border-right: 1px solid rgba(120,200,255,.45);
-      border-bottom: 1px solid rgba(120,200,255,.45);
-    }
-
-    /* Composer — bottom-center holographic note input. */
-    #composer {
-      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
-      width: min(640px, calc(100vw - 32px));
-      padding: 8px 10px;
-      border: 1px solid rgba(120,200,255,.35);
-      background: linear-gradient(135deg, rgba(20,30,55,.72), rgba(10,18,35,.85));
-      backdrop-filter: blur(6px) saturate(140%);
-      box-shadow: 0 0 24px rgba(80,160,255,.14), inset 0 0 10px rgba(120,200,255,.06);
-      border-radius: 8px;
-      z-index: 6;
-      display: flex; align-items: stretch; gap: 8px;
-    }
-    #composer textarea {
-      flex: 1; min-height: 36px; max-height: 30vh; resize: none;
-      background: transparent; color: #e6f1ff;
-      border: none; outline: none;
-      font: inherit; font-size: 13px; line-height: 1.4; padding: 8px 6px;
-    }
-    #composer textarea::placeholder { color: #5b7194; }
-    #composer button {
-      align-self: flex-end;
-      font: inherit; font-size: 12px; padding: 6px 14px; border-radius: 6px;
-      border: 1px solid rgba(159,220,255,.45); color: #d6e8ff;
-      background: linear-gradient(135deg, rgba(80,140,220,.35), rgba(60,100,180,.45));
-      cursor: pointer; min-width: 64px;
-    }
-    #composer button:hover:not([disabled]) { background: linear-gradient(135deg, rgba(100,170,255,.55), rgba(70,120,200,.6)); }
-    #composer button[disabled] { opacity: .5; cursor: progress; }
-    #composer .hint { position: absolute; right: 14px; bottom: -16px; font-size: 10px; color: #6b7e9f; }
-
-    @media (max-width: 600px) {
-      #hud { max-width: calc(100vw - 24px); }
-      #composer .hint { display: none; }
-    }
-  </style>
+  </script>
 </head>
 <body>
   <canvas id="scene"></canvas>
-  <div id="topbar">
-    <div>
-      <div class="title">rndexp · explorer</div>
-      <div class="meta">signed in as <strong>{{ me.email }}</strong></div>
+
+  <!-- SVG layer: green outer frame, red corner anchors, the cracked-eggshell
+       band of cells (#shell-layer), and the purple inner contour path. -->
+  <svg id="frame-svg" xmlns="http://www.w3.org/2000/svg">
+    <g id="shell-layer"></g>
+    <path id="frame-contour" d="" />
+    <rect id="frame-rect" x="0.5" y="0.5" />
+    <circle class="frame-anchor" r="6" id="anchor-tl" />
+    <circle class="frame-anchor" r="6" id="anchor-tr" />
+    <circle class="frame-anchor" r="6" id="anchor-bl" />
+    <circle class="frame-anchor" r="6" id="anchor-br" />
+  </svg>
+
+  <!-- In-world overlay host for the aimed polygon's translucent yellow card. -->
+  <div id="polygon-overlay-host"></div>
+
+  <!-- Functional widget hosts. These are positioned off-screen by default;
+       on first render shell.js teleports each one into its anchor cell's
+       <foreignObject>. The DOM lives here so panels.js can grab elements
+       by id without racing the eggshell layout. -->
+  <div id="hosts-staging" aria-hidden="true">
+    <div id="search-panel-host" role="region" aria-label="search">
+      <div class="brand">
+        <span class="title">rndexp · explorer</span>
+        <span class="meta">{{ me.email }}</span>
+      </div>
+      <input id="search-input" type="search" placeholder="search · / to focus" autocomplete="off" />
+      <ul id="search-results"></ul>
+      <form class="signout" action="https://auth.rndexp.art/logout" method="post">
+        <input type="hidden" name="target" value="https://explorer.rndexp.art/" />
+        <button type="submit" title="sign out">⤴</button>
+      </form>
     </div>
-    <form class="signout" action="https://auth.rndexp.art/logout" method="post">
-      <input type="hidden" name="target" value="https://explorer.rndexp.art/" />
-      <button type="submit">sign out</button>
-    </form>
+
+    <div id="dashboard-panel-host" role="region" aria-label="dashboard"></div>
+
+    <div id="control-panel-host" role="region" aria-label="control"></div>
+
+    <div id="input-panel-host" role="region" aria-label="composer">
+      <form id="composer" autocomplete="off">
+        <textarea name="content" placeholder="add a note  ⌘/Ctrl+↵" rows="1" maxlength="65536"></textarea>
+        <button type="submit">↵</button>
+      </form>
+    </div>
   </div>
+
+  <!-- Per-node HUD (snaps over hovered ball). Preserved from pre-redesign. -->
   <div id="hud" aria-hidden="true">
     <div class="label"></div>
     <div class="labels"></div>
     <div class="summary"></div>
   </div>
-  <form id="composer" autocomplete="off">
-    <textarea
-      name="content"
-      placeholder="add a note to your graph…  (⌘/Ctrl + Enter to send)"
-      rows="1" maxlength="65536"></textarea>
-    <button type="submit">send</button>
-    <div class="hint">⌘/Ctrl + Enter</div>
-  </form>
+
   <div id="status">loading…</div>
 
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://esm.sh/three@0.160.0",
-      "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
-    }
-  }
-  </script>
-
-  <script type="module">
-    import * as THREE from "three";
-    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
-    const status = document.getElementById("status");
-    const hud = document.getElementById("hud");
-    const hudLabel = hud.querySelector(".label");
-    const hudLabels = hud.querySelector(".labels");
-    const hudSummary = hud.querySelector(".summary");
-    const composer = document.getElementById("composer");
-    const composerInput = composer.querySelector("textarea");
-    const composerBtn = composer.querySelector("button");
-
-    function setStatus(text, kind = "") {
-      status.textContent = text;
-      status.classList.remove("error", "success");
-      if (kind) status.classList.add(kind);
-    }
-
-    // --- Scene ----------------------------------------------------------------
-    const canvas = document.getElementById("scene");
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
-    camera.position.set(0, 0, 320);
-
-    const controls = new OrbitControls(camera, canvas);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.rotateSpeed = 0.45;
-    controls.zoomSpeed = 0.6;
-    controls.enablePan = false;
-    controls.minDistance = 40;
-    controls.maxDistance = 800;
-
-    scene.add(new THREE.AmbientLight(0x223355, 0.85));
-    const key = new THREE.DirectionalLight(0xa0c8ff, 0.9);
-    key.position.set(150, 220, 180);
-    scene.add(key);
-
-    // Faint, slowly rotating starfield to reinforce "floating in space".
-    const starGeom = new THREE.BufferGeometry();
-    const starCount = 600;
-    const starPos = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount; i++) {
-      const r = 1100 + Math.random() * 300;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      starPos[i * 3 + 0] = r * Math.sin(phi) * Math.cos(theta);
-      starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      starPos[i * 3 + 2] = r * Math.cos(phi);
-    }
-    starGeom.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
-    const stars = new THREE.Points(
-      starGeom,
-      new THREE.PointsMaterial({ size: 1.4, sizeAttenuation: false, color: 0x6688aa, transparent: true, opacity: 0.55 }),
-    );
-    scene.add(stars);
-
-    // --- Sphere layout --------------------------------------------------------
-    function fibonacciSphere(n) {
-      // Even-spread points on a unit sphere. Stable for any N ≥ 1.
-      const pts = new Array(n);
-      const phi = Math.PI * (Math.sqrt(5) - 1);
-      for (let i = 0; i < n; i++) {
-        const y = 1 - (i / Math.max(1, n - 1)) * 2;
-        const r = Math.sqrt(1 - y * y);
-        const t = phi * i;
-        pts[i] = new THREE.Vector3(Math.cos(t) * r, y, Math.sin(t) * r);
-      }
-      return pts;
-    }
-
-    const world = new THREE.Group();
-    scene.add(world);
-
-    // One geometry, two materials — switch material on hover so we don't pay
-    // a draw-call setup per ball.
-    const ballGeom = new THREE.SphereGeometry(1, 16, 12);
-
-    // Different node kinds get different base colors so the graph reads at a
-    // glance: agent (gold), source (cyan), provider (violet), identity (mint),
-    // note / other (default blue).
-    function colorForLabels(labels) {
-      if (labels.includes("agent")) return 0xffd075;
-      if (labels.includes("source")) return 0x66e6ff;
-      if (labels.includes("provider")) return 0xc28cff;
-      if (labels.includes("identity")) return 0x8effc8;
-      return 0x6db4ff;
-    }
-    const matCache = new Map();
-    function ballMat(color) {
-      if (!matCache.has(color)) {
-        matCache.set(color, new THREE.MeshStandardMaterial({
-          color, emissive: new THREE.Color(color).multiplyScalar(0.18),
-          roughness: 0.45, metalness: 0.25,
-        }));
-      }
-      return matCache.get(color);
-    }
-    const ballMatHi = new THREE.MeshStandardMaterial({
-      color: 0xfff2a8, emissive: 0x6a4f00, roughness: 0.35, metalness: 0.3,
-    });
-
-    const edgeMat = new THREE.LineBasicMaterial({
-      color: 0x6da0ff, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending,
-    });
-
-    const RADIUS = 140;
-    const BALL_R = 4.0;
-
-    let nodes = [];   // { id, label, summary, base: Vec3, mesh, hover, ... }
-    let edges = [];   // { a, b, line, positions, attr }
-    let nodeById = new Map();
-
-    function buildScene(payload) {
-      // Wipe prior content (no-op on first build).
-      for (const n of nodes) world.remove(n.mesh);
-      for (const e of edges) world.remove(e.line);
-      nodes = []; edges = []; nodeById = new Map();
-      if (targeted) { targeted = null; hideHud(); }
-
-      const lattice = fibonacciSphere(payload.nodes.length);
-      payload.nodes.forEach((nd, i) => {
-        const base = lattice[i].clone().multiplyScalar(RADIUS);
-        const mat = ballMat(colorForLabels(nd.labels || []));
-        const mesh = new THREE.Mesh(ballGeom, mat);
-        mesh.position.copy(base);
-        mesh.scale.setScalar(BALL_R);
-        const seed = i * 0.137;
-        const node = { ...nd, base, mesh, mat, seed, hover: false };
-        mesh.userData.node = node;
-        world.add(mesh);
-        nodes.push(node);
-        nodeById.set(nd.id, node);
-      });
-
-      for (const ed of payload.edges) {
-        const a = nodeById.get(ed.src);
-        const b = nodeById.get(ed.dst);
-        if (!a || !b) continue;
-        const geom = new THREE.BufferGeometry();
-        const positions = new Float32Array(6);
-        geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-        const line = new THREE.Line(geom, edgeMat);
-        world.add(line);
-        edges.push({ a, b, line, positions, attr: geom.attributes.position });
-      }
-    }
-
-    // --- Undulation -----------------------------------------------------------
-    const AMP = 6.5;        // displacement amplitude (world units)
-    const FREQ = 0.45;      // temporal frequency
-    function undulate(t) {
-      for (const n of nodes) {
-        const b = n.base;
-        const s = n.seed;
-        n.mesh.position.x = b.x + AMP * Math.sin(t * FREQ + b.y * 0.05 + s);
-        n.mesh.position.y = b.y + AMP * Math.sin(t * FREQ * 1.13 + b.z * 0.05 + s * 1.7);
-        n.mesh.position.z = b.z + AMP * Math.sin(t * FREQ * 0.91 + b.x * 0.05 + s * 2.3);
-      }
-      for (const e of edges) {
-        const p = e.positions;
-        const a = e.a.mesh.position, b = e.b.mesh.position;
-        p[0] = a.x; p[1] = a.y; p[2] = a.z;
-        p[3] = b.x; p[4] = b.y; p[5] = b.z;
-        e.attr.needsUpdate = true;
-      }
-    }
-
-    // --- Targeting (hover / tap) ---------------------------------------------
-    const raycaster = new THREE.Raycaster();
-    raycaster.params.Line = { threshold: 6 };
-    const pointer = new THREE.Vector2();
-    let pointerActive = false;
-    let targeted = null;
-
-    function setPointerFromEvent(ev) {
-      const rect = canvas.getBoundingClientRect();
-      const x = (ev.clientX - rect.left) / rect.width;
-      const y = (ev.clientY - rect.top) / rect.height;
-      pointer.set(x * 2 - 1, -(y * 2 - 1));
-      pointerActive = true;
-    }
-    canvas.addEventListener("pointermove", setPointerFromEvent);
-    canvas.addEventListener("pointerdown", setPointerFromEvent);
-    canvas.addEventListener("pointerleave", () => { pointerActive = false; });
-
-    function pickTarget() {
-      if (!pointerActive || nodes.length === 0) return null;
-      raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(nodes.map(n => n.mesh), false);
-      return hits.length ? hits[0].object.userData.node : null;
-    }
-
-    function showHud(node) {
-      const v = node.mesh.position.clone().project(camera);
-      const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
-      const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
-      hud.style.left = sx + "px";
-      hud.style.top = sy + "px";
-      hud.classList.add("visible");
-      hud.setAttribute("aria-hidden", "false");
-      hudLabel.textContent = node.label || "(unnamed)";
-      hudLabels.textContent = (node.labels || []).join(" · ");
-      hudSummary.textContent = node.summary || "(no summary)";
-    }
-    function hideHud() {
-      hud.classList.remove("visible");
-      hud.setAttribute("aria-hidden", "true");
-    }
-
-    function applyTarget(next) {
-      if (next === targeted) {
-        if (next) showHud(next);
-        return;
-      }
-      if (targeted) {
-        targeted.hover = false;
-        targeted.mesh.material = targeted.mat;
-        targeted.mesh.scale.setScalar(BALL_R);
-      }
-      targeted = next;
-      if (targeted) {
-        targeted.hover = true;
-        targeted.mesh.material = ballMatHi;
-        targeted.mesh.scale.setScalar(BALL_R * 1.45);
-        showHud(targeted);
-      } else {
-        hideHud();
-      }
-    }
-
-    // --- Resize ---------------------------------------------------------------
-    function resize() {
-      const w = window.innerWidth, h = window.innerHeight;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    }
-    window.addEventListener("resize", resize);
-    resize();
-
-    // --- Animate --------------------------------------------------------------
-    const clock = new THREE.Clock();
-    function tick() {
-      const t = clock.getElapsedTime();
-      world.rotation.y = t * 0.04;
-      world.rotation.x = Math.sin(t * 0.07) * 0.08;
-      stars.rotation.y = t * 0.005;
-
-      undulate(t);
-
-      const picked = pickTarget();
-      applyTarget(picked);
-
-      controls.update();
-      renderer.render(scene, camera);
-      requestAnimationFrame(tick);
-    }
-
-    // --- Composer -------------------------------------------------------------
-    function autosizeTextarea() {
-      composerInput.style.height = "auto";
-      composerInput.style.height = Math.min(composerInput.scrollHeight, window.innerHeight * 0.3) + "px";
-    }
-    composerInput.addEventListener("input", autosizeTextarea);
-    composerInput.addEventListener("keydown", (ev) => {
-      if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") {
-        ev.preventDefault();
-        composer.requestSubmit();
-      }
-    });
-
-    composer.addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      const content = composerInput.value.trim();
-      if (!content) return;
-      composerBtn.disabled = true;
-      setStatus("saving note…");
-      try {
-        const res = await fetch("/api/notes", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ content }),
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`save failed (${res.status}): ${text || res.statusText}`);
-        }
-        composerInput.value = "";
-        autosizeTextarea();
-        setStatus("note saved · refreshing graph…", "success");
-        await refreshGraph();
-      } catch (e) {
-        console.error(e);
-        setStatus(String(e.message || e), "error");
-      } finally {
-        composerBtn.disabled = false;
-        composerInput.focus();
-      }
-    });
-
-    // --- Boot / refresh -------------------------------------------------------
-    async function refreshGraph() {
-      const res = await fetch("/api/graph", { credentials: "same-origin" });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`graph fetch ${res.status}: ${text || res.statusText}`);
-      }
-      const payload = await res.json();
-      buildScene(payload);
-      const note_count = payload.note_count ?? 0;
-      const note_word = note_count === 1 ? "note" : "notes";
-      setStatus(`${payload.nodes.length} nodes · ${payload.edges.length} edges · ${note_count} ${note_word}`);
-      return payload;
-    }
-
-    async function boot() {
-      try {
-        await refreshGraph();
-        requestAnimationFrame(tick);
-      } catch (e) {
-        console.error(e);
-        setStatus(String(e.message || e), "error");
-      }
-    }
-    boot();
-  </script>
+  <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

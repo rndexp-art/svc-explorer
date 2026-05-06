@@ -76,15 +76,36 @@ The bottom-center HUD-style panel posts `{content}` to `POST /api/notes`. The se
 
 `Cmd/Ctrl+Enter` submits.
 
-## Frontend (Three.js)
+## Frontend (Three.js + polygonal HUD)
 
-Single page, ESM imports from `esm.sh@0.160.0`, no build step.
+Still **no build step** — native ESM, with `three` and `d3-delaunay` imported via `esm.sh`. The design doc (`polygonalgraphexplorerdesign.md`) discusses Vite as a future option; for now we keep the no-build constraint and split the client into native ES modules served from `app/static/js/`. The design's `web/` directory is therefore not present; its module boundaries are mirrored 1:1 in `app/static/js/`:
 
-- **Layout**: Fibonacci lattice on a sphere of radius 140; ball radius 4.
-- **Undulation**: each ball gets a sum-of-sines displacement (different freq per axis, per-ball seed) so the sphere "breathes" without losing structure.
-- **Colors**: agent gold · source cyan · provider violet · identity mint · note default blue.
-- **Targeting**: per-frame raycast from the cursor. Hovered ball gets a hot-yellow material and 1.45× scale.
-- **HUD**: CSS panel snapped to the targeted ball's projected screen position; shows label, `:labels` joined, and summary.
+| Module | Responsibility |
+|---|---|
+| `app/static/js/main.js` | Boot, rAF loop, fly-to handler. |
+| `app/static/js/store.js` | Single source of truth + tiny event-emitter (`subscribe(key, fn)`); exposes `aimPolygon`, `activatePolygon`, `deactivatePolygon`, `ingestGraphPayload`, `setStatus`. |
+| `app/static/js/api.js` | `/api/graph`, `/api/notes` wrappers. |
+| `app/static/js/scene.js` | Three.js scene, OrbitControls, `placeNodes(payload, mode)` (sphere or `force3d`), undulation, per-frame node raycast. |
+| `app/static/js/polygons.js` | Delaunay polygon detection (filtered by edge existence), transparent → aimed → activated state machine, in-world yellow mesh, centroid overlay. |
+| `app/static/js/shell.js` | Cracked-eggshell shell layout, SVG `<polygon>` + `<foreignObject>` screens, purple contour `<path>`, tether `Line`s. |
+| `app/static/js/panels.js` | Four peripheral panels (search/control/input/dashboard) + the per-node HUD card. |
+| `app/static/css/explorer.css` | Palette + frame/anchor/contour/shell/panel styles. |
+
+Visual language (per design §8):
+
+- **Outer frame**: rectangular green stroke (`--frame-green #39ff8b`) on the four panels' inner edges; only four red corner anchors (`--anchor-red #ff4757`) break it.
+- **Inner contour**: irregular `--contour-violet #9a4cff` SVG `<path>` between the panels and the shell of activated polygons; rectangular when nothing's pinned, deforms locally as polygons are activated.
+- **Aimed polygon**: in-world translucent yellow (`--aimed-yellow #ffd84a`) `THREE.Mesh` over the three-vertex face; in-place HTML overlay at the centroid with vertex labels, edge-type chips, intersected-label tag, and a sparkline-style time band when ≥ 2 vertices are notes.
+- **Activated shell**: SVG `<g>` per polygon, fill in `--shell-glass`, content rendered via `foreignObject` so it stays normal HTML/CSS. `THREE.Line` tether from one vertex to the wedge's inner anchor.
+- **Node colors**: agent gold · source cyan · provider violet · identity mint · note default blue (unchanged).
+
+Polygon detection runs **client-side, throttled to 4 Hz**, via `d3-delaunay` over the projected 2D node positions, filtered to triangles whose three edges all exist in `graph.edgeKey`. The `:input:note` / `:agent` / `:identity` / `:provider` / `:source` payload fields the UI relies on are emitted by `app/graph.py:_node_payload` (which adds `created_at` and `kind` to the original `id`/`label`/`labels`/`summary` shape so the aimed overlay and dashboard sparkline have data to render).
+
+State transitions (per design §5):
+
+- **Transparent**: invisible proxy `THREE.Mesh` per polygon, raycastable so the cursor can pick it.
+- **Aimed**: hover (or first tap) swaps to the yellow material; the centroid overlay fades in. `Esc` cancels, `Enter` activates.
+- **Activated**: click promotes the polygon out of the in-world group and into the SVG shell layer. `×` on the shell screen (or right-panel "deactivate all") returns it to transparent.
 
 ## What lives here
 
@@ -93,7 +114,9 @@ Single page, ESM imports from `esm.sh@0.160.0`, no build step.
 - `app/main.py` — FastAPI routes, lifespan-managed schema/driver.
 - `app/auth.py` — header-based auth dependency.
 - `app/graph.py` — neo4j driver, bootstrap, subgraph query, note write.
-- `app/templates/index.html` — single-page Three.js client.
+- `app/templates/index.html` — Jinja shell (panels, SVG frame, importmap); imports `/static/js/main.js`.
+- `app/static/js/*.js` — ESM modules (see "Frontend" table above); `app/static/css/explorer.css` carries the visual language.
+- `polygonalgraphexplorerdesign.md` — design doc the current frontend implements (Phases 1–4); Phase 5 polish + the optional length-bounded chordless-cycle enumeration are still TODO.
 
 ## Required env vars
 
@@ -110,5 +133,5 @@ Single page, ESM imports from `esm.sh@0.160.0`, no build step.
 - The `(:identity)-[:provider]->(:provider)` edge is the new schema convention. The telegram-bot writer was updated in the same change to MERGE this edge on every message; existing identities catch up the next time their owner posts.
 - Bind container ports inside the docker network only. Caddy is the public ingress.
 - All hostnames in `caddy.fragment` use the production form (`*.rndexp.art`); the gateway's renderer rewrites them for local.
-- No build step for the frontend — the HTML imports Three.js from `esm.sh`. If we ever want to vendor it, drop a copy into `app/static/` and switch the import.
+- No build step for the frontend — the HTML imports `three`, `three/addons/`, and `d3-delaunay` from `esm.sh` via an importmap. If we ever want to vendor a dep, drop a copy into `app/static/` and switch the import. The design doc's Vite cutover (Phase 0) is **not** in place; reach for it the moment we want TypeScript or HMR.
 - The Cypher writes are idempotent at the node level via `MERGE` + uniqueness constraints. The note `CREATE` is *not* idempotent — duplicate POSTs would create duplicate notes; the client-side disable-on-submit prevents the obvious case.

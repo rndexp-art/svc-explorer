@@ -257,11 +257,18 @@ def _node_payload(node) -> dict[str, Any]:
     if len(summary) > 280:
         summary = summary[:277] + "…"
 
+    created_at = props.get("created_at")
+    if created_at is not None and not isinstance(created_at, (str, int, float)):
+        # neo4j DateTime → ISO 8601 so the frontend can `new Date(...)` it.
+        created_at = created_at.iso_format() if hasattr(created_at, "iso_format") else str(created_at)
+
     return {
         "id": node.element_id,
         "label": label,
         "labels": labels,
         "summary": summary,
+        "created_at": created_at,
+        "kind": props.get("kind"),
     }
 
 
